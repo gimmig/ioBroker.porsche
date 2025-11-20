@@ -1,8 +1,12 @@
 {
   "common": {
     "name": "porsche",
-    "version": "0.2.0",
+    "version": "0.3.0",
     "news": {
+      "0.3.0": {
+        "en": "Added token-based authentication for better reliability and container support",
+        "de": "Token-basierte Authentifizierung für bessere Zuverlässigkeit und Container-Unterstützung hinzugefügt"
+      },
       "0.2.0": {
         "en": "fix login"
       },
@@ -82,11 +86,12 @@
       }
     ]
   },
-  "encryptedNative": ["password"],
-  "protectedNative": ["password"],
+  "encryptedNative": ["password", "refreshToken"],
+  "protectedNative": ["password", "refreshToken"],
   "native": {
     "username": "",
     "password": "",
+    "refreshToken": "",
     "interval": 10
   },
   "objects": [],
