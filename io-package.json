@@ -86,11 +86,9 @@
       }
     ]
   },
-  "encryptedNative": ["password", "refreshToken"],
-  "protectedNative": ["password", "refreshToken"],
+  "encryptedNative": ["refreshToken"],
+  "protectedNative": ["refreshToken"],
   "native": {
-    "username": "",
-    "password": "",
     "refreshToken": "",
     "interval": 10
   },

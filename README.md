@@ -68,31 +68,6 @@ Token-based authentication is more reliable, secure, and works perfectly in cont
 
 8. Copy the refresh token to the adapter configuration in ioBroker Admin:
    - **Refresh Token:** `<paste your token here>`
-   - **Username:** (leave empty)
-   - **Password:** (leave empty)
-
-#### **Option B: Automatic Token Generation (Requires Puppeteer)**
-
-If you have Puppeteer installed:
-
-```bash
-cd /opt/iobroker/node_modules/iobroker.porsche
-node setup-refresh-token.js "your-email@example.com" "your-password"
-```
-
-The script will:
-- Automatically log in via browser automation
-- Extract and display the refresh token
-- Test the token to ensure it works
-
-#### **Option C: Username & Password (Legacy)**
-
-Not recommended for production environments, especially in containers:
-
-- **Username:** Your Porsche Connect email
-- **Password:** Your Porsche Connect password
-
-**Note:** This method requires browser automation (Puppeteer) and may fail in containerized environments.
 
 ---
 
@@ -157,18 +132,11 @@ The adapter creates the following data structures under `porsche.0.<VIN>`:
 
 ## 🐳 Container Environments (LXC, Docker, Proxmox)
 
-**Token-based authentication is specifically designed for containerized environments!**
+**Token-based authentication works perfectly in containerized environments!**
 
-### Why Token-Based Auth?
+### Benefits
 
-Traditional browser-based login requires:
-- Chromium/Chrome (~500MB)
-- Puppeteer (~300MB)
-- 15+ system libraries
-- Often fails in LXC containers due to missing dependencies
-
-Token-based authentication requires:
-- Only Node.js + axios
+- Only Node.js + axios required
 - No browser dependencies
 - ~1 second to refresh token
 - Works in any environment
@@ -177,7 +145,7 @@ Token-based authentication requires:
 
 1. **Generate token on your local machine** (where browser works)
 2. **Copy token to container** via ioBroker Admin UI
-3. **Enjoy automatic token refresh** - no browser needed!
+3. **Enjoy automatic token refresh**
 
 ---
 
@@ -200,23 +168,6 @@ Token-based authentication requires:
 ```bash
 cd /opt/iobroker/node_modules/iobroker.porsche
 npm install
-```
-
-### Browser-based login fails in container
-
-**Cause:** Missing Chrome/Chromium dependencies
-
-**Solution:** Use token-based authentication instead (see above)
-
-### "Puppeteer not installed" error
-
-**This is normal if using token-based auth!**
-
-Token-based authentication doesn't need Puppeteer. Only install Puppeteer if you want to use the automatic token generation script:
-
-```bash
-cd /opt/iobroker/node_modules/iobroker.porsche
-npm install puppeteer@19.11.1
 ```
 
 ---
@@ -243,24 +194,18 @@ npm install puppeteer@19.11.1
 
 **Major Update: Token-Based Authentication**
 
-- ✅ **Added token-based authentication** - No browser automation needed in production
-- ✅ **Added `lib/token-manager.js`** - Handles token refresh without Puppeteer
-- ✅ **Updated `main.js`** - Prioritizes token refresh over browser login
-- ✅ **Updated `lib/browser-login.js`** - Made Puppeteer optional
+- ✅ **Token-based authentication** - Uses refresh token for API access
+- ✅ **Added `lib/token-manager.js`** - Handles token refresh
 - ✅ **Added admin UI field** - Refresh token configuration in settings
-- ✅ **Added setup scripts:**
-  - `get-refresh-token-simple.js` - Manual token generation (no Puppeteer)
-  - `setup-refresh-token.js` - Automatic token generation (requires Puppeteer)
-  - `test-browser-login.js` - Test browser login functionality
-- ✅ **Perfect for containers** - Works in LXC, Docker, Proxmox without Chrome/Chromium
+- ✅ **Added `get-refresh-token-simple.js`** - Manual token generation script
+- ✅ **Perfect for containers** - Works in LXC, Docker, Proxmox
 - ✅ **Better error handling** - Clear messages for token expiration and auth failures
 - ✅ **Updated dependencies** - Latest Porsche Connect API client ID
 
 **Migration from 0.2.0:**
-1. Generate refresh token using provided scripts
+1. Generate refresh token using `get-refresh-token-simple.js`
 2. Add token to adapter configuration
-3. Remove username/password (optional)
-4. Restart adapter
+3. Restart adapter
 
 ### 0.2.0
 
