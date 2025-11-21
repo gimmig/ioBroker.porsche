@@ -34,7 +34,7 @@ Connect your Porsche to ioBroker and access vehicle data, charging status, clima
 Install via ioBroker Admin interface or:
 
 ```bash
-npm install iobroker.porsche
+iobroker url gimmig/iobroker.porsche
 ```
 
 ### 2. Configure Authentication
