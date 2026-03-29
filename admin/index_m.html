@@ -62,13 +62,27 @@
             }
             $('#loginStatus').text('Logging in...').css('color', '#aaa');
             $('#loginBtn').addClass('disabled');
-            sendTo('porsche.0', 'loginWithCredentials', { username: username, password: password }, function (result) {
+            var adapterInstance = (typeof adapter !== 'undefined' ? adapter : 'porsche') + '.' + (typeof instance !== 'undefined' ? instance : 0);
+            var loginTimeout = setTimeout(function () {
                 $('#loginBtn').removeClass('disabled');
-                if (result.error) {
-                    $('#loginStatus').text('Error: ' + result.error).css('color', 'red');
+                $('#loginStatus').text('Timeout — no response from adapter. Check ioBroker log.').css('color', 'red');
+            }, 35000);
+            sendTo(adapterInstance, 'loginWithCredentials', { username: username, password: password }, function (result) {
+                clearTimeout(loginTimeout);
+                $('#loginBtn').removeClass('disabled');
+                // sendTo wraps the response in result.result for non-error paths
+                var data = (result && result.result !== undefined) ? result.result : result;
+                var err = (result && result.error) ? result.error : (data && data.error);
+                if (err) {
+                    $('#loginStatus').text('Error: ' + err).css('color', 'red');
                     return;
                 }
-                $('#refreshToken').val(result.refreshToken).trigger('change');
+                var token = data && data.refreshToken;
+                if (!token) {
+                    $('#loginStatus').text('No token in response — check ioBroker log').css('color', 'red');
+                    return;
+                }
+                $('#refreshToken').val(token).trigger('change');
                 if (M) M.updateTextFields();
                 $('#loginStatus').text('✓ Login successful! Click Save to apply.').css('color', '#4caf50');
             });
