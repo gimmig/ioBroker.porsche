@@ -59,6 +59,7 @@ class Porsche extends utils.Adapter {
         this.on('ready',       this.onReady.bind(this));
         this.on('stateChange', this.onStateChange.bind(this));
         this.on('unload',      this.onUnload.bind(this));
+        this.on('message',     this.onMessage.bind(this));
 
         this.json2iob      = new Json2iob(this);
         this.session       = {};
@@ -380,6 +381,65 @@ class Porsche extends utils.Adapter {
             this.refreshTimeout = setTimeout(async () => {
                 if (!this._unloading) await this.updateDevices();
             }, 10 * 1000);
+        }
+    }
+
+    // ── Admin messages ────────────────────────────────────────────────────────
+
+    onMessage(obj) {
+        if (!obj || !obj.command) return;
+
+        if (obj.command === 'loginWithCredentials') {
+            const { username, password } = obj.message || {};
+            if (!username || !password) {
+                this.sendTo(obj.from, obj.command, { error: 'Username and password are required' }, obj.callback);
+                return;
+            }
+            const tokenManager = new TokenManager(this.log);
+            tokenManager.loginWithCredentials(username, password)
+                .then(session => {
+                    this.sendTo(obj.from, obj.command, { refreshToken: session.refresh_token }, obj.callback);
+                })
+                .catch(err => {
+                    this.sendTo(obj.from, obj.command, { error: err.message }, obj.callback);
+                });
+            return;
+        }
+
+        if (obj.command === 'getAuthUrl') {
+            const tokenManager = new TokenManager(this.log);
+            const [codeVerifier, codeChallenge] = tokenManager.getCodeChallenge();
+            const authUrl =
+                'https://identity.porsche.com/authorize?' +
+                'scope=openid%20profile%20email%20offline_access%20mbb%20ssodb%20badge%20vin%20dealers%20cars%20charging%20manageCharging%20plugAndCharge%20climatisation%20manageClimatisation' +
+                '&code_challenge_method=S256' +
+                '&device=touch' +
+                '&redirect_uri=my-porsche-app://auth0/callback' +
+                '&client_id=XhygisuebbrqQ80byOuU5VncxLIm8E6H' +
+                '&prompt=login' +
+                '&response_type=code' +
+                '&code_challenge=' + codeChallenge +
+                '&ext-country=DE' +
+                '&audience=https://api.porsche.com' +
+                '&state=admin_' + Math.random().toString(36).substring(7) +
+                '&ui_locales=de-DE';
+            this.sendTo(obj.from, obj.command, { authUrl, codeVerifier }, obj.callback);
+        }
+
+        if (obj.command === 'exchangeCode') {
+            const { authCode, codeVerifier } = obj.message || {};
+            if (!authCode || !codeVerifier) {
+                this.sendTo(obj.from, obj.command, { error: 'Missing authCode or codeVerifier' }, obj.callback);
+                return;
+            }
+            const tokenManager = new TokenManager(this.log);
+            tokenManager.exchangeCodeForToken(authCode, codeVerifier)
+                .then(session => {
+                    this.sendTo(obj.from, obj.command, { refreshToken: session.refresh_token }, obj.callback);
+                })
+                .catch(err => {
+                    this.sendTo(obj.from, obj.command, { error: err.message }, obj.callback);
+                });
         }
     }
 

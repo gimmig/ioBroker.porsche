@@ -20,32 +20,25 @@
     <script type="text/javascript">
         // This will be called by the admin adapter when the settings page loads
         function load(settings, onChange) {
-            // example: select elements with id=key and class=value and insert value
             if (!settings) return;
             $('.value').each(function () {
                 var $key = $(this);
                 var id = $key.attr('id');
                 if ($key.attr('type') === 'checkbox') {
-                    // do not call onChange direct, because onChange could expect some arguments
                     $key.prop('checked', settings[id])
-                        .on('change', () => onChange())
-                        ;
+                        .on('change', () => onChange());
                 } else {
-                    // do not call onChange direct, because onChange could expect some arguments
                     $key.val(settings[id])
                         .on('change', () => onChange())
-                        .on('keyup', () => onChange())
-                        ;
+                        .on('keyup', () => onChange());
                 }
             });
             onChange(false);
-            // reinitialize all the Materialize labels on the page if you are dynamically adding inputs:
             if (M) M.updateTextFields();
         }
 
         // This will be called by the admin adapter when the user presses the save button
         function save(callback) {
-            // example: select elements with class=value and build settings object
             var obj = {};
             $('.value').each(function () {
                 var $this = $(this);
@@ -58,6 +51,27 @@
                 }
             });
             callback(obj);
+        }
+
+        function doLogin() {
+            var username = $('#loginUsername').val().trim();
+            var password = $('#loginPassword').val();
+            if (!username || !password) {
+                $('#loginStatus').text('Please enter email and password.').css('color', 'orange');
+                return;
+            }
+            $('#loginStatus').text('Logging in...').css('color', '#aaa');
+            $('#loginBtn').addClass('disabled');
+            sendTo('porsche.0', 'loginWithCredentials', { username: username, password: password }, function (result) {
+                $('#loginBtn').removeClass('disabled');
+                if (result.error) {
+                    $('#loginStatus').text('Error: ' + result.error).css('color', 'red');
+                    return;
+                }
+                $('#refreshToken').val(result.refreshToken).trigger('change');
+                if (M) M.updateTextFields();
+                $('#loginStatus').text('✓ Login successful! Click Save to apply.').css('color', '#4caf50');
+            });
         }
     </script>
 
@@ -73,12 +87,33 @@
             </div>
         </div>
 
-        <!-- Put your content here -->
+        <!-- Login flow -->
+        <div class="row">
+            <div class="col s12 m6 input-field">
+                <input type="email" id="loginUsername" />
+                <label for="loginUsername" class="translate">Porsche ID (Email)</label>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col s12 m6 input-field">
+                <input type="password" id="loginPassword" />
+                <label for="loginPassword" class="translate">Password</label>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col s12">
+                <a id="loginBtn" class="waves-effect waves-light btn" onclick="doLogin()">
+                    <i class="material-icons left">vpn_key</i><span class="translate">Get Token</span>
+                </a>
+                <span id="loginStatus" style="margin-left:12px;font-size:0.85em;"></span>
+            </div>
+        </div>
+
+        <!-- Token field -->
         <div class="row">
             <div class="col s12 input-field">
                 <input type="password" class="value" id="refreshToken" />
                 <label for="refreshToken" class="translate">Refresh Token</label>
-                <span class="translate">Get token with: node get-refresh-token-simple.js</span>
             </div>
         </div>
 
