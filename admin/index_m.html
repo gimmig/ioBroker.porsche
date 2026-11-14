@@ -71,7 +71,7 @@
                 }
                 browserVerifier = data.codeVerifier;
                 if (win) win.location.href = data.authUrl; else window.open(data.authUrl, '_blank');
-                $('#browserStatus').text('Log in in the new tab, then copy the full address from its address bar into the field below.').css('color', '#aaa');
+                $('#browserStatus').text('Log in in the new tab, then copy the full address from its address bar into the field below – right away, the code is only valid for about a minute.').css('color', '#aaa');
             });
         }
         function finishBrowserLogin() {
