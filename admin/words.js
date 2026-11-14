@@ -14,9 +14,9 @@ systemDictionary = {
         "en": "1. Open Porsche login",
         "de": "1. Porsche-Anmeldung öffnen"
     },
-    "2. Paste the address after login (https://security.porsche.com/...?code=...)": {
-        "en": "2. Paste the address after login (https://security.porsche.com/...?code=...)",
-        "de": "2. Adresse nach der Anmeldung einfügen (https://security.porsche.com/...?code=...)"
+    "2. Paste the address after login (https://security.porsche.com/...#code=...)": {
+        "en": "2. Paste the address after login (https://security.porsche.com/...#code=...)",
+        "de": "2. Adresse nach der Anmeldung einfügen (https://security.porsche.com/...#code=...)"
     },
     "3. Get token": {
         "en": "3. Get token",
