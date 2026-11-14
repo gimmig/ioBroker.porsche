@@ -38,14 +38,14 @@ async function getRefreshToken() {
   const tokenManager = new TokenManager(logger);
   const [code_verifier, codeChallenge] = tokenManager.getCodeChallenge();
 
-  const authUrl = tokenManager.buildAuthUrl(codeChallenge, 'manual_' + Math.random().toString(36).substring(7));
+  const authUrl = tokenManager.buildAuthUrl(codeChallenge);
 
   console.log('Step 1: Open this URL in your browser:\n');
   console.log(authUrl);
   console.log('\n');
 
   console.log('Step 2: After logging in, you will be redirected to a URL like:');
-  console.log('   https://security.porsche.com/auth/en-GB/app/callback?code=XXXXX&state=XXXXX\n');
+  console.log('   https://security.porsche.com/auth/en-GB/app/callback?code=XXXXX\n');
 
   console.log('Step 3: Copy the ENTIRE redirect URL and paste it below.\n');
   console.log('If the page shows an error (e.g., "Cannot open app"), that\'s normal!');

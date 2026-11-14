@@ -437,7 +437,7 @@ class Porsche extends utils.Adapter {
         if (obj.command === 'getAuthUrl') {
             const tokenManager = new TokenManager(this.log);
             const [codeVerifier, codeChallenge] = tokenManager.getCodeChallenge();
-            const authUrl = tokenManager.buildAuthUrl(codeChallenge, 'admin_' + Math.random().toString(36).substring(7));
+            const authUrl = tokenManager.buildAuthUrl(codeChallenge);
             this.sendTo(obj.from, obj.command, { authUrl, codeVerifier }, obj.callback);
         }
 
