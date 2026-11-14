@@ -79,7 +79,7 @@
                 }
                 var token = data && data.refreshToken;
                 if (!token) {
-                    $('#loginStatus').text('No token in response — check ioBroker log').css('color', 'red');
+                    $('#loginStatus').text('No answer from the adapter — is the instance enabled and running? Check ioBroker log').css('color', 'red');
                     return;
                 }
                 $('#refreshToken').val(token).trigger('change');
