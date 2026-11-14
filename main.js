@@ -4,6 +4,7 @@ const utils        = require('@iobroker/adapter-core');
 const axios        = require('axios').default;
 const Json2iob     = require('json2iob');
 const { v4: uuidv4 } = require('uuid');
+const crypto       = require('crypto');
 const TokenManager = require('./lib/token-manager');
 
 // ── Constants ────────────────────────────────────────────────────────────────
@@ -99,6 +100,12 @@ class Porsche extends utils.Adapter {
             return;
         }
 
+        await this.setObjectNotExistsAsync('auth.refreshToken', {
+            type: 'state',
+            common: { name: 'Latest (rotated) refresh token, encrypted', type: 'string', role: 'text', read: true, write: false },
+            native: {},
+        });
+
         this.subscribeStates('*');
         const ok = await this.login();
         if (!ok) return;
@@ -130,18 +137,38 @@ class Porsche extends utils.Adapter {
 
     // ── Auth ──────────────────────────────────────────────────────────────────
 
+    // Porsche ID (Auth0) rotates refresh tokens: every refresh returns a new one and the old one
+    // becomes invalid. The rotated token is therefore kept (encrypted) in auth.refreshToken and used
+    // on the next start. It is tied to a fingerprint of the configured token, so pasting a new token
+    // into the settings always wins over the stored one.
+    _seed() {
+        return crypto.createHash('sha256').update(String(this.config.refreshToken)).digest('hex').substring(0, 16);
+    }
+
+    async _currentRefreshToken() {
+        try {
+            const state = await this.getStateAsync('auth.refreshToken');
+            const stored = state && state.val ? JSON.parse(String(state.val)) : null;
+            if (stored && stored.seed === this._seed() && stored.token) return this.decrypt(stored.token);
+        } catch (error) {
+            this.log.warn('Stored refresh token unreadable, using the configured one: ' + error.message);
+        }
+        return this.config.refreshToken;
+    }
+
+    async _saveRefreshToken(token) {
+        if (!token) return;
+        await this.setStateAsync('auth.refreshToken', JSON.stringify({ seed: this._seed(), token: this.encrypt(token), ts: Date.now() }), true);
+    }
+
     async login() {
         try {
             this.log.info('Authenticating with refresh token...');
             const tokenManager = new TokenManager(this.log);
-            this.session = await tokenManager.refreshAccessToken(this.config.refreshToken);
+            this.session = await tokenManager.refreshAccessToken(await this._currentRefreshToken());
+            await this._saveRefreshToken(this.session.refresh_token);
             this.setState('info.connection', true, true);
             this.log.info('Authentication successful');
-
-            if (this.session.refresh_token && this.session.refresh_token !== this.config.refreshToken) {
-                this.log.warn('Refresh token was rotated — update the "refreshToken" setting with: ' +
-                    this.session.refresh_token.substring(0, 20) + '...');
-            }
             return true;
         } catch (error) {
             this.log.error('Login failed: ' + error.message);
@@ -178,6 +205,7 @@ class Porsche extends utils.Adapter {
             this.log.debug('Refreshing access token...');
             const tokenManager = new TokenManager(this.log);
             this.session = await tokenManager.refreshAccessToken(this.session.refresh_token);
+            await this._saveRefreshToken(this.session.refresh_token);
             this.setState('info.connection', true, true);
             this.log.info('Token refreshed successfully');
             this._scheduleTokenRefresh();
