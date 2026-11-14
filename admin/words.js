@@ -2,6 +2,30 @@
 "use strict";
 
 systemDictionary = {
+    "Login via browser (recommended)": {
+        "en": "Login via browser (recommended)",
+        "de": "Anmeldung im Browser (empfohlen)"
+    },
+    "Porsche blocks password logins from servers (\"Suspicious request\"). Log in in your browser instead – solve the CAPTCHA if asked. Afterwards the page may show an error or stay blank; that is fine, just copy the full address from the address bar.": {
+        "en": "Porsche blocks password logins from servers (\"Suspicious request\"). Log in in your browser instead – solve the CAPTCHA if asked. Afterwards the page may show an error or stay blank; that is fine, just copy the full address from the address bar.",
+        "de": "Porsche blockiert Passwort-Anmeldungen von Servern („Suspicious request“). Melde dich stattdessen im Browser an und löse ggf. das CAPTCHA. Danach zeigt die Seite evtl. einen Fehler oder bleibt leer – das ist normal. Kopiere einfach die komplette Adresse aus der Adresszeile."
+    },
+    "1. Open Porsche login": {
+        "en": "1. Open Porsche login",
+        "de": "1. Porsche-Anmeldung öffnen"
+    },
+    "2. Paste the address after login (https://security.porsche.com/...?code=...)": {
+        "en": "2. Paste the address after login (https://security.porsche.com/...?code=...)",
+        "de": "2. Adresse nach der Anmeldung einfügen (https://security.porsche.com/...?code=...)"
+    },
+    "3. Get token": {
+        "en": "3. Get token",
+        "de": "3. Token holen"
+    },
+    "Alternative: email and password": {
+        "en": "Alternative: email and password",
+        "de": "Alternativ: E-Mail und Passwort"
+    },
     "porsche adapter settings": {
         "en": "Adapter settings for porsche",
         "de": "Adaptereinstellungen für porsche",

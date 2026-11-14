@@ -38,28 +38,14 @@ async function getRefreshToken() {
   const tokenManager = new TokenManager(logger);
   const [code_verifier, codeChallenge] = tokenManager.getCodeChallenge();
 
-  const authUrl =
-    'https://identity.porsche.com/authorize?' +
-    'scope=openid%20profile%20email%20offline_access%20mbb%20ssodb%20badge%20vin%20dealers%20cars%20charging%20manageCharging%20plugAndCharge%20climatisation%20manageClimatisation' +
-    '&code_challenge_method=S256' +
-    '&device=touch' +
-    '&redirect_uri=my-porsche-app://auth0/callback' +
-    '&client_id=XhygisuebbrqQ80byOuU5VncxLIm8E6H' +
-    '&prompt=login' +
-    '&response_type=code' +
-    '&code_challenge=' +
-    codeChallenge +
-    '&ext-country=DE' +
-    '&audience=https://api.porsche.com' +
-    '&state=manual_' + Math.random().toString(36).substring(7) +
-    '&ui_locales=de-DE';
+  const authUrl = tokenManager.buildAuthUrl(codeChallenge, 'manual_' + Math.random().toString(36).substring(7));
 
   console.log('Step 1: Open this URL in your browser:\n');
   console.log(authUrl);
   console.log('\n');
 
   console.log('Step 2: After logging in, you will be redirected to a URL like:');
-  console.log('   my-porsche-app://auth0/callback?code=XXXXX&state=XXXXX\n');
+  console.log('   https://security.porsche.com/auth/en-GB/app/callback?code=XXXXX&state=XXXXX\n');
 
   console.log('Step 3: Copy the ENTIRE redirect URL and paste it below.\n');
   console.log('If the page shows an error (e.g., "Cannot open app"), that\'s normal!');
@@ -70,8 +56,7 @@ async function getRefreshToken() {
 
   try {
     // Extract code from URL
-    const urlParams = new URLSearchParams(callbackUrl.split('?')[1]);
-    const authCode = urlParams.get('code');
+    const authCode = tokenManager.extractCode(callbackUrl);
 
     if (!authCode) {
       console.error('❌ No authorization code found in URL');
@@ -81,8 +66,10 @@ async function getRefreshToken() {
     console.log('✅ Authorization code extracted\n');
     console.log('Step 4: Exchanging code for tokens...\n');
 
-    // Exchange code for tokens
-    const session = await tokenManager.exchangeCodeForToken(authCode, code_verifier);
+    // Exchange code for tokens, then refresh once to prove it works. Refresh tokens rotate, so the
+    // token to keep is the one returned by that refresh – the first one is already used up.
+    const firstSession = await tokenManager.exchangeCodeForToken(authCode, code_verifier);
+    const session = await tokenManager.refreshAccessToken(firstSession.refresh_token);
 
     console.log('✅ Tokens received!\n');
 
@@ -115,12 +102,8 @@ async function getRefreshToken() {
     console.log('   ✅ Much lower resource usage');
     console.log('   ✅ More reliable\n');
 
-    // Test the refresh token
-    console.log('🧪 Testing refresh token...\n');
-    const refreshedSession = await tokenManager.refreshAccessToken(session.refresh_token);
-
-    console.log('✅ Refresh token works! Token refresh test successful.\n');
-    console.log(`   New access token expires in: ${refreshedSession.expires_in} seconds\n`);
+    console.log('✅ Refresh token tested (token refresh works).\n');
+    console.log(`   Access token expires in: ${session.expires_in} seconds\n`);
 
     console.log('✅ Setup complete!\n');
 

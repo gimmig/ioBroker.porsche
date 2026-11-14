@@ -53,6 +53,47 @@
             callback(obj);
         }
 
+        // Browser login (recommended): Porsche's bot protection blocks password logins from servers,
+        // so the user signs in in a real browser and pastes the address they land on afterwards.
+        var browserVerifier = null;
+        function instanceId() {
+            return (typeof adapter !== 'undefined' ? adapter : 'porsche') + '.' + (typeof instance !== 'undefined' ? instance : 0);
+        }
+        function openBrowserLogin() {
+            var win = window.open('about:blank', '_blank');      // open synchronously, popup blockers allow this
+            $('#browserStatus').text('Opening Porsche login...').css('color', '#aaa');
+            sendTo(instanceId(), 'getAuthUrl', {}, function (result) {
+                var data = (result && result.result !== undefined) ? result.result : result;
+                if (!data || !data.authUrl) {
+                    if (win) win.close();
+                    $('#browserStatus').text('No answer from the adapter — is the instance enabled and running?').css('color', 'red');
+                    return;
+                }
+                browserVerifier = data.codeVerifier;
+                if (win) win.location.href = data.authUrl; else window.open(data.authUrl, '_blank');
+                $('#browserStatus').text('Log in in the new tab, then copy the full address from its address bar into the field below.').css('color', '#aaa');
+            });
+        }
+        function finishBrowserLogin() {
+            var pasted = $('#callbackUrl').val().trim();
+            if (!browserVerifier) { $('#browserStatus').text('Please start with step 1 first.').css('color', 'orange'); return; }
+            if (!pasted) { $('#browserStatus').text('Please paste the address first.').css('color', 'orange'); return; }
+            $('#browserStatus').text('Getting token...').css('color', '#aaa');
+            sendTo(instanceId(), 'exchangeCode', { authCode: pasted, codeVerifier: browserVerifier }, function (result) {
+                var data = (result && result.result !== undefined) ? result.result : result;
+                var err = (result && result.error) ? result.error : (data && data.error);
+                if (err || !data || !data.refreshToken) {
+                    $('#browserStatus').text('Error: ' + (err || 'no token received')).css('color', 'red');
+                    return;
+                }
+                $('#refreshToken').val(data.refreshToken).trigger('change');
+                if (M) M.updateTextFields();
+                $('#callbackUrl').val('');
+                browserVerifier = null;
+                $('#browserStatus').text('✓ Token received! Click Save to apply.').css('color', '#4caf50');
+            });
+        }
+
         function doLogin() {
             var username = $('#loginUsername').val().trim();
             var password = $('#loginPassword').val();
@@ -101,7 +142,27 @@
             </div>
         </div>
 
+        <!-- Browser login (recommended) -->
+        <div class="row">
+            <div class="col s12">
+                <h6 class="translate">Login via browser (recommended)</h6>
+                <p class="translate" style="font-size:0.9em;color:#888;margin:4px 0 8px">Porsche blocks password logins from servers ("Suspicious request"). Log in in your browser instead – solve the CAPTCHA if asked. Afterwards the page may show an error or stay blank; that is fine, just copy the full address from the address bar.</p>
+                <a class="waves-effect waves-light btn" onclick="openBrowserLogin()"><i class="material-icons left">open_in_new</i><span class="translate">1. Open Porsche login</span></a>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col s12 m9 input-field">
+                <input type="text" id="callbackUrl" />
+                <label for="callbackUrl" class="translate">2. Paste the address after login (https://security.porsche.com/...?code=...)</label>
+            </div>
+            <div class="col s12 m3" style="padding-top:18px">
+                <a class="waves-effect waves-light btn" onclick="finishBrowserLogin()"><i class="material-icons left">vpn_key</i><span class="translate">3. Get token</span></a>
+            </div>
+            <div class="col s12"><span id="browserStatus" style="font-size:0.85em;"></span></div>
+        </div>
+
         <!-- Login flow -->
+        <div class="row"><div class="col s12"><h6 class="translate">Alternative: email and password</h6></div></div>
         <div class="row">
             <div class="col s12 m6 input-field">
                 <input type="email" id="loginUsername" />

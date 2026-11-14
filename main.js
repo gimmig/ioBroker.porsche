@@ -437,30 +437,18 @@ class Porsche extends utils.Adapter {
         if (obj.command === 'getAuthUrl') {
             const tokenManager = new TokenManager(this.log);
             const [codeVerifier, codeChallenge] = tokenManager.getCodeChallenge();
-            const authUrl =
-                'https://identity.porsche.com/authorize?' +
-                'scope=openid%20profile%20email%20offline_access%20mbb%20ssodb%20badge%20vin%20dealers%20cars%20charging%20manageCharging%20plugAndCharge%20climatisation%20manageClimatisation' +
-                '&code_challenge_method=S256' +
-                '&device=touch' +
-                '&redirect_uri=my-porsche-app://auth0/callback' +
-                '&client_id=XhygisuebbrqQ80byOuU5VncxLIm8E6H' +
-                '&prompt=login' +
-                '&response_type=code' +
-                '&code_challenge=' + codeChallenge +
-                '&ext-country=DE' +
-                '&audience=https://api.porsche.com' +
-                '&state=admin_' + Math.random().toString(36).substring(7) +
-                '&ui_locales=de-DE';
+            const authUrl = tokenManager.buildAuthUrl(codeChallenge, 'admin_' + Math.random().toString(36).substring(7));
             this.sendTo(obj.from, obj.command, { authUrl, codeVerifier }, obj.callback);
         }
 
         if (obj.command === 'exchangeCode') {
-            const { authCode, codeVerifier } = obj.message || {};
+            const { codeVerifier } = obj.message || {};
+            const tokenManager = new TokenManager(this.log);
+            const authCode = tokenManager.extractCode(obj.message && obj.message.authCode);
             if (!authCode || !codeVerifier) {
-                this.sendTo(obj.from, obj.command, { error: 'Missing authCode or codeVerifier' }, obj.callback);
+                this.sendTo(obj.from, obj.command, { error: 'No login code found – paste the whole address after logging in' }, obj.callback);
                 return;
             }
-            const tokenManager = new TokenManager(this.log);
             tokenManager.exchangeCodeForToken(authCode, codeVerifier)
                 .then(session => {
                     this.sendTo(obj.from, obj.command, { refreshToken: session.refresh_token }, obj.callback);
