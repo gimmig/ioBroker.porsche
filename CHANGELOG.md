@@ -1,5 +1,23 @@
 # Changelog
 
+## WORK IN PROGRESS (2026-11-15)
+
+### 🔐 Login
+- **Browser login in the adapter settings.** Porsche now rejects password logins from servers ("Suspicious request requires verification"). The settings page opens the Porsche login in your browser; you paste the resulting address back and the adapter exchanges the code for a refresh token.
+- New Porsche callback address `https://security.porsche.com/auth/en-GB/app/callback` (the old `my-porsche-app://auth0/callback` is no longer accepted). The login is started without `state` so Porsche's web app doesn't swallow the code.
+- `get-refresh-token-simple.js` updated for the new flow.
+- Error messages now include Porsche's reason (Auth0 error body) instead of only the HTTP status.
+
+### 🔄 Token handling
+- Porsche rotates the refresh token on every renewal. The newest token is now stored encrypted in `auth.refreshToken` and used on the next start, so a restart no longer ends in `403`.
+- `messagebox` enabled in `io-package.json` so the admin page gets answers from the adapter ("No token in response").
+
+### 🚦 Rate limits
+- On `429 Too Many Requests` the adapter pauses status updates (honours `Retry-After`, otherwise 30 min doubling up to 6 h) and doesn't wake the car right after the pause.
+
+### 📝 Docs
+- README rewritten: browser login, token rotation, rate limits, actual data point and command names, troubleshooting (privacy mode, 429, login loop).
+
 ## 0.3.0 (2025-11-09)
 
 ### 🚀 Major Update: Token-Based Authentication

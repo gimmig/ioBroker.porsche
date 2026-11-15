@@ -23,7 +23,8 @@ Connect your Porsche to ioBroker and access vehicle data, charging status, clima
 - 🌡️ **Climate Control** - Check and control climate/pre-conditioning
 - 🚗 **Vehicle Data** - Access mileage, fuel level, tire pressure, and more
 - 📍 **Location** - Get current vehicle position
-- 🔐 **Secure Authentication** - Token-based authentication (recommended) or username/password
+- 🔐 **Browser Login** - Log in once in your own browser; the adapter keeps the session alive
+- 🎛️ **Remote Control** - Climatisation, heating, lock/unlock, on-demand refresh
 
 ---
 
@@ -37,134 +38,121 @@ Install via ioBroker Admin interface or:
 iobroker url gimmig/iobroker.porsche
 ```
 
-### 2. Configure Authentication
+### 2. Log in (get a refresh token)
 
-**Recommended: Token-Based Authentication (Production)**
+The adapter talks to Porsche with a **refresh token**. You get it once by logging in with your Porsche ID; after that the adapter renews it on its own.
 
-Token-based authentication is more reliable, secure, and works perfectly in containerized environments (LXC, Docker, etc.).
+Porsche blocks password logins that come from a server ("Suspicious request requires verification"), so the login happens in **your own browser**:
 
-#### **Option A: Manual Token Generation (No Browser Automation Needed)**
-
-1. On your local machine (Mac/Windows/Linux):
-   ```bash
-   cd /opt/iobroker/node_modules/iobroker.porsche
-   node get-refresh-token-simple.js
+1. Open the adapter settings in ioBroker Admin.
+2. Click **"1. Open Porsche login"** and sign in with your Porsche ID. Solve the CAPTCHA if one is shown.
+3. After the login the page may stay blank, keep loading or show an error — **that is expected**. Copy the full address from the address bar. It looks like
    ```
-
-2. Open the displayed URL in your browser
-
-3. Log in with your Porsche Connect credentials
-
-4. After login, you'll see an error page ("App cannot be opened") - **this is normal**
-
-5. Copy the entire URL from the address bar:
+   https://security.porsche.com/auth/en-GB/app/callback?code=XXXXX
    ```
-   my-porsche-app://auth0/callback?code=XXXXX&state=XXXXX
-   ```
+4. Paste it into field **"2. Paste the address after login"** and click **"3. Get token"**.
+5. The refresh token is filled in automatically. Click **Save**.
 
-6. Paste the URL into the script
+The login code is only valid for a few minutes and only once — if the token request fails, start again at step 2.
 
-7. The script will display your **refresh token**
+**Without ioBroker Admin:** the same flow works on the command line:
 
-8. Copy the refresh token to the adapter configuration in ioBroker Admin:
-   - **Refresh Token:** `<paste your token here>`
+```bash
+cd /opt/iobroker/node_modules/iobroker.porsche
+node get-refresh-token-simple.js
+```
+
+Open the printed URL, log in, paste the callback address back into the terminal and copy the printed refresh token into the adapter settings.
+
+The **email/password** fields in the settings are still there, but Porsche normally rejects that login with "Suspicious request". Use the browser login instead.
+
+### 3. Update interval
+
+`Update interval in minutes` controls how often the car's status is fetched (minimum 0.5). Porsche limits how many requests an account may make, so keep it generous — **15–30 minutes, or several hours** if you only need occasional data. Use `remote.Refresh` to fetch fresh data on demand.
 
 ---
 
-## 🔄 How Token-Based Authentication Works
+## 🔄 How Authentication Works
 
-### Initial Setup (One-Time)
-1. Generate refresh token using one of the methods above
-2. Configure refresh token in adapter settings
-3. Save and restart adapter
+- The access token lives about 1 hour; the adapter renews it shortly before it expires.
+- Porsche **rotates** the refresh token on every renewal — the old one stops working. The adapter stores the newest token encrypted in `porsche.0.auth.refreshToken` and uses it on the next start, so restarts and reboots don't log you out.
+- The stored token is bound to the token in the settings. Pasting a new token in the settings replaces it.
+- If the refresh token is no longer accepted (e.g. after a long time offline or a password change), log in again as described above.
 
-### Daily Operation
-- Adapter automatically refreshes access token every 60 minutes
-- No browser or heavy dependencies needed
-- Minimal resource usage
-- Works reliably in containers (LXC, Docker, Proxmox, etc.)
+---
 
-### Token Expiration
-- Refresh tokens typically expire after ~90 days of inactivity
-- If token expires, simply generate a new one using the same method
+## 🚦 Rate Limits and Waking the Car
+
+- When Porsche answers with **429 Too Many Requests**, the adapter pauses all status updates instead of retrying every interval (that would keep the block alive). It honours Porsche's `Retry-After` if sent, otherwise it waits 30 minutes and doubles the pause up to 6 hours. The log shows: `Porsche API rate limit (429) — pausing updates until …`
+- At most every 3 hours a regular update also **wakes the car** so the data is current. `remote.Force_Refresh` wakes it immediately. Waking costs the most quota — don't trigger it in automations.
 
 ---
 
 ## 🎛️ Control Commands
 
-Set `porsche.0.<VIN>.remote.*` states to `true` or `false` to control your vehicle:
+Set `porsche.0.<VIN>.remote.<command>` to `true`:
 
-| State | Description |
-|-------|-------------|
-| `directCharge.start` | Start charging |
-| `directCharge.stop` | Stop charging |
-| `climatisation.start` | Start climate control |
-| `climatisation.stop` | Stop climate control |
-| `honkAndFlash` | Honk horn and flash lights |
-| `flash` | Flash lights |
+| Command | Action |
+|---------|--------|
+| `REMOTE_CLIMATIZER_START` / `REMOTE_CLIMATIZER_STOP` | Start / stop climatisation |
+| `REMOTE_CLIMATIZER-temperature` | Target temperature for the next start (number, default 22 °C) |
+| `REMOTE_HEATING_START` / `REMOTE_HEATING_STOP` | Start / stop heating |
+| `REMOTE_ACV_START` / `REMOTE_ACV_STOP` | Start / stop ACV (only on models that support it) |
+| `LOCK` / `UNLOCK` | Lock / unlock the car |
+| `Refresh` | Fetch the current status now |
+| `Force_Refresh` | Wake the car, then fetch the status |
+
+About 10 seconds after an accepted command the status is fetched again.
 
 ---
 
 ## 📊 Available Data Points
 
-The adapter creates the following data structures under `porsche.0.<VIN>`:
+Under `porsche.0.<VIN>`:
 
-### Status
-- `status.batteryLevel` - Battery charge level (%)
-- `status.remainingRanges` - Remaining ranges (electric, fuel, total)
-- `status.mileage` - Current mileage
-- `status.fuelLevel` - Fuel level (for hybrid models)
-- `status.chargingStatus` - Current charging status
-- `status.climatisationState` - Climate control status
+- `general.*` — model, model year, VIN and other vehicle details
+- `pictures.*` — vehicle image URLs
+- `status.<FIELD>.value.*` — one channel per Porsche status field, for example:
 
-### Position
-- `position.latitude` - Current latitude
-- `position.longitude` - Current longitude
-- `position.heading` - Vehicle heading
+| Field | Example data point |
+|-------|--------------------|
+| `BATTERY_LEVEL` | `status.BATTERY_LEVEL.value.percent` |
+| `E_RANGE` | `status.E_RANGE.value.kilometers` |
+| `MILEAGE` | `status.MILEAGE.value.kilometers` |
+| `CLIMATIZER_STATE` | `status.CLIMATIZER_STATE.value.isOn` |
+| `GPS_LOCATION` | `status.GPS_LOCATION.value.location` (`"lat,lon"`) |
+| `LOCK_STATE_VEHICLE` | `status.LOCK_STATE_VEHICLE.value.isLocked` |
+| `GLOBAL_PRIVACY_MODE` | `status.GLOBAL_PRIVACY_MODE.value.isEnabled` |
 
-### Remote Control
-- `remote.directCharge` - Start/stop charging
-- `remote.climatisation` - Control climate/pre-conditioning
-- `remote.honkAndFlash` - Flash lights and honk
-- `remote.flash` - Flash lights only
+Also included: charging state and profiles, fuel and oil levels, doors/windows/lids, tire pressure, service intervals, timers and trip statistics. Which fields are filled depends on the model.
+
+- `porsche.0.auth.refreshToken` — the rotated refresh token (encrypted, read-only)
 
 ---
 
 ## 🐳 Container Environments (LXC, Docker, Proxmox)
 
-**Token-based authentication works perfectly in containerized environments!**
-
-### Benefits
-
-- Only Node.js + axios required
-- No browser dependencies
-- ~1 second to refresh token
-- Works in any environment
-
-### Setup in Containers
-
-1. **Generate token on your local machine** (where browser works)
-2. **Copy token to container** via ioBroker Admin UI
-3. **Enjoy automatic token refresh**
+The adapter needs only Node.js and axios — no browser in the container. The login runs in the browser on your own computer; the token is pasted via ioBroker Admin.
 
 ---
 
 ## 🛠️ Troubleshooting
 
-### "Token refresh failed: invalid_grant"
+### Data is old / not updating
+- **Privacy mode is on in the car.** Porsche then returns no current data. Check `status.GLOBAL_PRIVACY_MODE.value.isEnabled` and switch privacy mode off in the car's settings.
+- **Rate limit.** Look for `429` in the log — the adapter pauses on its own. Increase the update interval.
 
-**Cause:** Refresh token expired or invalid
+### "Suspicious request requires verification"
+Porsche blocked the email/password login. Use the browser login.
 
-**Solution:**
-1. Generate a new refresh token using `get-refresh-token-simple.js`
-2. Update token in adapter configuration
-3. Restart adapter
+### The login page keeps loading / loops
+Expected after a successful login — copy the address from the address bar as it is (it contains `?code=`).
+
+### "Request failed with status code 403" / "invalid_grant" when getting the token
+The login code was already used, expired, or was copied from a different page. Start the browser login again and paste the new address within a few minutes. When the adapter's saved refresh token is rejected, log in again the same way.
 
 ### "Cannot find module 'token-manager'"
-
-**Cause:** Adapter not fully installed
-
-**Solution:**
+The adapter is not fully installed:
 ```bash
 cd /opt/iobroker/node_modules/iobroker.porsche
 npm install
@@ -174,21 +162,21 @@ npm install
 
 ## 🔐 Security
 
-### Refresh Token Storage
-
-- Refresh tokens are **encrypted** in ioBroker's configuration
-- Stored in `protectedNative` and `encryptedNative` fields
-- Never logged or exposed in plain text
-
-### Token Lifecycle
-
-- Access tokens expire after 1 hour (automatically refreshed)
-- Refresh tokens expire after ~90 days of inactivity
-- Both are handled automatically by the adapter
+- The refresh token in the settings is stored encrypted (`encryptedNative` / `protectedNative`); the rotated token in `auth.refreshToken` is encrypted with ioBroker's system secret.
+- Tokens and passwords are never written to the log.
+- Anyone with the refresh token can control the car — don't share it, and log in again if it leaks.
 
 ---
 
 ## 📝 Changelog
+
+### **WORK IN PROGRESS**
+
+- Browser login in the adapter settings (Porsche blocks server password logins); new Porsche callback address
+- Rotated refresh token is saved encrypted and survives restarts
+- Pause on Porsche rate limit (429) instead of retrying every interval
+- Show Porsche's reason when a token request is rejected
+- Fixed `get-refresh-token-simple.js` for the new login flow
 
 ### 0.3.0 (2025-11-09)
 
