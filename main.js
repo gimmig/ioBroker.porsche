@@ -15,6 +15,8 @@ const RETRY_COUNT       = 3;
 const RETRY_BASE_DELAY  = 2000;    // ms — doubles on each attempt
 const TOKEN_REFRESH_MARGIN = 0.9;  // refresh at 90% of expires_in to avoid edge expiry
 const FORCE_REFRESH_INTERVAL = 1000 * 60 * 60 * 3; // 3 hours
+const BACKOFF_MIN = 1000 * 60 * 30;       // first pause after a 429
+const BACKOFF_MAX = 1000 * 60 * 60 * 6;   // longest pause
 
 // Fields requested from the status endpoint
 const STATUS_FIELDS = [
@@ -66,6 +68,8 @@ class Porsche extends utils.Adapter {
         this.session       = {};
         this.deviceArray   = [];
         this.lastForceRefresh = 0;
+        this.backoffUntil     = 0;
+        this.backoffMs        = 0;
 
         // Token refresh lock — prevents concurrent refresh calls
         this._refreshing        = false;
@@ -312,6 +316,12 @@ class Porsche extends utils.Adapter {
             return;
         }
 
+        // Porsche rate-limited us: stay quiet until the pause is over, otherwise every poll extends the block
+        if (Date.now() < this.backoffUntil) {
+            this.log.debug(`Rate limited — skipping update until ${new Date(this.backoffUntil).toLocaleTimeString()}`);
+            return;
+        }
+
         // Auto force-refresh every 3 hours to keep car data fresh
         if (!forceRefresh && Date.now() - this.lastForceRefresh > FORCE_REFRESH_INTERVAL) {
             forceRefresh = true;
@@ -333,6 +343,7 @@ class Porsche extends utils.Adapter {
                     url,
                     headers: this._headers(),
                 });
+                this.backoffMs = 0;
                 if (res.data) {
                     this.json2iob.parse(vin + '.status', res.data, {
                         channelName: 'Status of the car',
@@ -345,11 +356,27 @@ class Porsche extends utils.Adapter {
                     this.refreshTokenTimeout = setTimeout(() => {
                         if (!this._unloading) this.refreshToken();
                     }, 5000);
+                } else if (error.response && error.response.status === 429) {
+                    this._startBackoff(error.response.headers);
+                    break;
                 } else {
                     this.log.error(`Status update failed for ${vin}: ${error.message}`);
                 }
             }
         }
+    }
+
+    /** Pause polling after a 429 — honours Retry-After, else 30 min doubling up to 6 h. */
+    _startBackoff(headers) {
+        const ra = headers && headers['retry-after'];
+        let ms = 0;
+        if (ra) ms = /^\d+$/.test(ra) ? Number(ra) * 1000 : Date.parse(ra) - Date.now();
+        if (!(ms > 0)) ms = this.backoffMs ? Math.min(this.backoffMs * 2, BACKOFF_MAX) : BACKOFF_MIN;
+        this.backoffMs    = ms;
+        this.backoffUntil = Date.now() + ms;
+        // don't wake the car right after the pause — that is what costs the most quota
+        this.lastForceRefresh = Date.now();
+        this.log.warn(`Porsche API rate limit (429) — pausing updates until ${new Date(this.backoffUntil).toLocaleTimeString()}`);
     }
 
     // ── State change handler ──────────────────────────────────────────────────
